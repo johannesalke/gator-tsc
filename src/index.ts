@@ -8,7 +8,7 @@ import { createUser, deleteAllUsers, getUserById, getUserByName, getUsers } from
 import { fetchFeed } from "./rss.js";
 import { createFeed, getFeedByUrl, getFeeds } from "./db/queries/feeds.js";
 import { Feed, User } from "./db/schema.js";
-import { createFeedFollow, getFeedFollowsForUser } from "./db/queries/feed_follows.js";
+import { createFeedFollow, getFeedFollowsForUser, unfollowFeed } from "./db/queries/feed_follows.js";
 
 
 
@@ -30,6 +30,7 @@ async function main() {
     registerCommand(registry, "feeds", handlerFeeds)
     registerCommand(registry, "follow", handlerFollow)
     registerCommand(registry, "following", handlerFollowing)
+    registerCommand(registry, "unfollow", handlerUnfollow)
 
     let args = process.argv.slice(2,)
     if (args.length == 0) {
@@ -52,6 +53,14 @@ await main();
 type CommandHandler = (cmdName: string, ...args: string[]) => Promise<void>;
 
 type CommandsRegistry = Record<string, CommandHandler>
+
+type UserCommandHandler = (
+    cmdName: string,
+    user: User,
+    ...args: string[]
+) => Promise<void>;
+
+type middlewareLoggedIn = (handler: UserCommandHandler) => CommandHandler;
 
 function registerCommand(registry: CommandsRegistry, cmdName: string, handler: CommandHandler) {
 
@@ -178,6 +187,21 @@ async function handlerFollowing(cmdName: string, ...args: string[]) {
     for (let ff of feed_follows) {
         console.log(`Username: ${ff.users.name}, Feed name: ${ff.feeds.name}`)
     }
+}
+
+async function handlerUnfollow(cmdName: string, ...args: string[]) {
+    if (args.length != 1) {
+        console.log("This command takes exactly 1 argument: url of the feed to be unfollowed")
+        exit(1)
+    }
+    const feed = await getFeedByUrl(args[0])
+    const user = await getUserByName(await config.readConfig().currentUserName)
+    const feed_follow = await unfollowFeed(user.id, feed.id)
+    if (!feed_follow) {
+        throw new Error("Something went wrong...")
+    }
+    console.log("Unfollowed from feed " + feed.name)
+
 }
 
 
